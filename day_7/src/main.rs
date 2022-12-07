@@ -7,13 +7,18 @@ use std::iter::once;
 static INPUT: &str = include_str!("input");
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let term_lines = parse_input(INPUT)?;
-    let fs_tree = build_fs_tree(&term_lines);
+    let fs_tree = build_fs_tree(INPUT)?;
 
     println!("Part 1 result: {}", part_1(&fs_tree));
     println!("Part 2 result: {}", part_2(&fs_tree));
 
     Ok(())
+}
+
+#[derive(Debug, PartialEq)]
+enum FsNode {
+    Dir(HashMap<String, FsNode>),
+    File(u64),
 }
 
 fn part_1(fs_tree: &HashMap<String, FsNode>) -> u64 {
@@ -51,36 +56,46 @@ fn size_of_dir(dir: &HashMap<String, FsNode>) -> (u64, Vec<u64>) {
     (curr_dir_size, inner_dirs)
 }
 
-fn build_fs_tree(term_lines: &[TermLine]) -> HashMap<String, FsNode> {
+fn build_fs_tree(input: &str) -> Result<HashMap<String, FsNode>, String> {
     let mut current_path: Vec<String> = vec![];
     let mut fs: HashMap<String, FsNode> = HashMap::new();
 
-    for line in term_lines {
-        match line {
-            TermLine::Cmd(TermCmd::CmdCd(path)) => {
-                if path == "/" {
-                    current_path = vec![];
-                } else if path == ".." {
+    for line in input.lines() {
+        if line.starts_with("$ ls") {
+            // Do nothing
+        } else if line.starts_with("$ cd ") {
+            match line.split_at(5).1.trim() {
+                "/" => current_path = vec![],
+                ".." => {
                     current_path.pop();
-                } else {
-                    current_path.push(path.clone());
                 }
+                path => current_path.push(path.to_owned()),
             }
-            TermLine::Cmd(TermCmd::CmdLs) => {}
-            TermLine::Res(TermRes::ResDir { name }) => {
+        } else if line.starts_with("$") {
+            Err(format!("Invalid: '{}'", line))?;
+        } else {
+            let mut parts = line.split(" ");
+            let res_type = parts.next().ok_or(format!("Invalid: '{}'", line))?;
+            let name = parts
+                .next()
+                .ok_or(format!("Invalid: '{}'", line))?
+                .to_owned();
+            if res_type == "dir" {
                 add_node(
                     &mut fs,
                     &current_path,
                     name.clone(),
                     FsNode::Dir(HashMap::new()),
                 );
-            }
-            TermLine::Res(TermRes::ResFile { name, size }) => {
-                add_node(&mut fs, &current_path, name.clone(), FsNode::File(*size));
+            } else {
+                let size = res_type
+                    .parse::<u64>()
+                    .map_err(|_| format!("Invalid: '{}'", line))?;
+                add_node(&mut fs, &current_path, name.clone(), FsNode::File(size));
             }
         }
     }
-    fs
+    Ok(fs)
 }
 
 fn add_node(fs: &mut HashMap<String, FsNode>, path: &[String], node_name: String, node: FsNode) {
@@ -101,78 +116,11 @@ fn add_node(fs: &mut HashMap<String, FsNode>, path: &[String], node_name: String
     curr_dir.insert(node_name, node);
 }
 
-#[derive(Debug, PartialEq)]
-enum FsNode {
-    Dir(HashMap<String, FsNode>),
-    File(u64),
-}
-
-#[derive(Debug, PartialEq)]
-enum TermLine {
-    Cmd(TermCmd),
-    Res(TermRes),
-}
-
-#[derive(Debug, PartialEq)]
-enum TermCmd {
-    CmdCd(String),
-    CmdLs,
-}
-
-#[derive(Debug, PartialEq)]
-enum TermRes {
-    ResDir { name: String },
-    ResFile { name: String, size: u64 },
-}
-
-fn parse_input(input: &str) -> Result<Vec<TermLine>, String> {
-    input
-        .lines()
-        .map(|line| {
-            if line.starts_with("$ ") {
-                parse_command(line.split_at(2).1).map(|cmd| TermLine::Cmd(cmd))
-            } else {
-                parse_result(line).map(|res| TermLine::Res(res))
-            }
-        })
-        .collect()
-}
-
-fn parse_command(cmd: &str) -> Result<TermCmd, String> {
-    if cmd.starts_with("ls") {
-        Ok(TermCmd::CmdLs)
-    } else if cmd.starts_with("cd ") {
-        Ok(TermCmd::CmdCd(cmd.split_at(3).1.trim().to_owned()))
-    } else {
-        Err(format!("Not a valid command: '{}'", cmd))
-    }
-}
-
-fn parse_result(res: &str) -> Result<TermRes, String> {
-    let mut parts = res.split(" ");
-    let res_type = parts
-        .next()
-        .ok_or(format!("Not a valid Result: '{}'", res))?;
-    let name = parts
-        .next()
-        .ok_or(format!("Not a valid Result: '{}'", res))?
-        .to_owned();
-
-    if res_type == "dir" {
-        Ok(TermRes::ResDir { name })
-    } else {
-        let size = res_type
-            .parse::<u64>()
-            .map_err(|_| format!("Not a valid Result: '{}'", res))?;
-        Ok(TermRes::ResFile { name, size })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn test_data() -> Vec<TermLine> {
+    fn fs_tree() -> HashMap<String, FsNode> {
         let test_input = "$ cd /
 $ ls
 dir a
@@ -196,11 +144,7 @@ $ ls
 8033020 d.log
 5626152 d.ext
 7214296 k";
-        parse_input(test_input).unwrap()
-    }
-
-    fn fs_tree() -> HashMap<String, FsNode> {
-        build_fs_tree(&test_data())
+        build_fs_tree(test_input).unwrap()
     }
 
     #[test]
