@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use std::collections::HashSet;
 use crate::parser_generator::{parse_sensors};
 use crate::sensors::{Point, Sensor};
@@ -42,12 +43,32 @@ fn part_1(sensors: &[Sensor], y: i64) -> usize {
 }
 
 fn part_2(sensors: &[Sensor], max_coord: i64) -> i64 {
-    for x in 0..=max_coord {
-        for y in 0..=max_coord {
-            let pt = Point{x, y};
-            if sensors.iter().all(|s| s.position.distance_to(&pt) > s.beacon_distance) {
-                return x * 4000000 + y;
+
+    fn maybe_add(pts: &mut Vec<Point>, x: i64, y: i64, max_coord: i64) {
+        if x >= 0 && x <= max_coord && y >= 0 && y <= max_coord {
+            pts.push(Point { x, y });
+        }
+    }
+
+    fn perimeter(sensor: &Sensor, max_coord: i64) -> Vec<Point> {
+        let mut pts = Vec::new();
+        let dist = sensor.beacon_distance + 1;
+        for x_dist in -dist..dist {
+            let x = sensor.position.x + x_dist;
+            let y_dist = dist - x_dist.abs();
+            if y_dist == 0 {
+                maybe_add(&mut pts, x, sensor.position.y, max_coord);
+            } else {
+                maybe_add(&mut pts, x, sensor.position.y + y_dist, max_coord);
+                maybe_add(&mut pts, x, sensor.position.y - y_dist, max_coord);
             }
+        }
+        pts
+    }
+
+    for pt in sensors.iter().flat_map(|s| perimeter(s, max_coord)) {
+        if sensors.iter().all(|s| s.position.distance_to(&pt) > s.beacon_distance) {
+            return pt.x * 4000000 + pt.y;
         }
     }
     0

@@ -6,7 +6,7 @@ pub struct Point {
 
 impl Point {
     pub fn distance_to(&self, other: &Point) -> i64 {
-        i64::abs(self.x - other.x) + i64::abs(self.y - other.y)
+        (self.x - other.x).abs() + (self.y - other.y).abs()
     }
 }
 
