@@ -146,6 +146,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "day_24"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "maplit",
+ "peg",
+]
+
+[[package]]
 name = "day_3"
 version = "0.1.0"
 dependencies = [
